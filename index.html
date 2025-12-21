@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>Indira Travels | Live Tracking Dashboard</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        :root { --primary: #d32f2f; --dark: #121212; --panel: #1e1e1e; --text: #e0e0e0; }
+        body, html { margin: 0; padding: 0; height: 100%; font-family: 'Segoe UI', sans-serif; background: var(--dark); overflow: hidden; }
+        .app-container { display: flex; height: 100vh; flex-direction: row; }
+        
+        /* Sidebar Design */
+        .sidebar { 
+            width: 340px; background: var(--panel); z-index: 2000; display: flex; 
+            flex-direction: column; color: var(--text); border-right: 1px solid #333;
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .header { padding: 20px; background: #000; border-bottom: 2px solid var(--primary); position: relative; }
+        .header h1 { margin: 0; font-size: 18px; color: var(--primary); text-transform: uppercase; text-align: center; }
+        
+        .mobile-toggle {
+            display: none; position: absolute; top: -20px; left: 50%; transform: translateX(-50%);
+            background: var(--primary); width: 40px; height: 40px; border-radius: 50%;
+            justify-content: center; align-items: center; color: white; font-size: 20px;
+            cursor: pointer; box-shadow: 0 -2px 10px rgba(0,0,0,0.5); z-index: 2001;
+        }
+
+        .timer-panel { padding: 15px; background: #252525; margin: 10px; border-radius: 12px; border: 1px solid #333; text-align: center; }
+        .timer-value { font-size: 28px; font-weight: 800; color: var(--primary); margin: 5px 0; }
+        
+        .timeline { flex: 1; overflow-y: auto; padding: 10px 30px; position: relative; }
+        .timeline::before { content: ''; position: absolute; left: 35px; top: 0; bottom: 0; width: 2px; background: #333; }
+        
+        .stop { position: relative; padding-left: 30px; margin-bottom: 25px; z-index: 5; }
+        .stop::before { content: ''; position: absolute; left: -1px; top: 6px; width: 10px; height: 10px; border-radius: 50%; background: #444; border: 2px solid var(--panel); transition: all 0.3s ease; }
+        
+        .stop.passed::before { background: var(--primary); border-color: #ff5252; box-shadow: 0 0 10px var(--primary); }
+        .stop.current::before { background: #fff; border-color: var(--primary); box-shadow: 0 0 15px #fff; transform: scale(1.3); }
+
+        .stop-time { display: block; font-size: 11px; color: var(--primary); font-weight: bold; }
+        .stop-name { font-size: 14px; transition: all 0.3s ease; }
+        .delay-tag { font-size: 10px; padding: 2px 5px; border-radius: 3px; margin-left: 5px; }
+        .delay-late { background: #fee2e2; color: #991b1b; }
+        .delay-early { background: #dcfce7; color: #166534; }
+
+        #map { flex: 1; z-index: 1; }
+        .bus-container { transition: all 2s linear; }
+        .bus-image { width: 60px; height: auto; transform-origin: center; filter: drop-shadow(0 5px 8px rgba(0,0,0,0.6)); }
+
+        @media (max-width: 768px) {
+            .app-container { flex-direction: column; }
+            .sidebar { position: fixed; bottom: 0; left: 0; width: 100%; height: 140px; border-radius: 20px 20px 0 0; }
+            .sidebar.expanded { height: 100vh; }
+            .mobile-toggle { display: flex; }
+            .sidebar.expanded .mobile-toggle { transform: translateX(-50%) rotate(180deg); top: 10px; }
+            #map { height: 100vh; width: 100vw; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="app-container">
+    <div class="sidebar" id="sidebar">
+        <div class="mobile-toggle" onclick="toggleSidebar()">▲</div>
+        <div class="header"><h1>Indira Travels</h1></div>
+        <div class="timer-panel">
+            <div style="font-size: 10px; color: #888;">TIME REMAINING</div>
+            <div class="timer-value"><span id="mins-left">--</span> <small style="font-size:12px; color:#555;">MINS</small></div>
+            <div id="status" style="font-size: 11px; color: #4caf50;">● TELEMETRY ACTIVE</div>
+        </div>
+        <div class="timeline" id="timeline"></div>
+    </div>
+    <div id="map"></div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+    // Schedule shifted by +6h 10m to make Christ College 05:00 AM
+    const stops = [
+        { name: "Kalasipalyam", time: "03:40", latlng: [12.9595, 77.5806], m: 0, offset: 0 },
+        { name: "Majestic", time: "04:40", latlng: [12.9775, 77.5745], m: 60, offset: 3 },
+        { name: "Shanthinagar", time: "04:50", latlng: [12.9551, 77.5924], m: 70, offset: 10 },
+        { name: "Nimhans", time: "04:55", latlng: [12.9407, 77.5983], m: 75, offset: -4 },
+        { name: "Christ College", time: "05:00", latlng: [12.9362, 77.6062], m: 80, offset: 2 },
+        { name: "St John's Hospital", time: "05:05", latlng: [12.9296, 77.6160], m: 85, offset: -3 },
+        { name: "Madiwala Police Stn", time: "05:20", latlng: [12.9202, 77.6205], m: 100, offset: 5 },
+        { name: "Silk Board", time: "05:25", latlng: [12.9173, 77.6232], m: 105, offset: 8 },
+        { name: "Bommanahalli", time: "05:30", latlng: [12.9067, 77.6284], m: 110, offset: 0 },
+        { name: "Hosa Road", time: "05:40", latlng: [12.8707, 77.6529], m: 120, offset: -2 },
+        { name: "Electronic City", time: "05:50", latlng: [12.8452, 77.6602], m: 130, offset: 0 },
+        { name: "Krishnagiri Junction", time: "07:25", latlng: [12.5186, 78.2137], m: 225, offset: 0 },
+        { name: "Tiruvannamalai", time: "09:55", latlng: [12.2253, 79.0747], m: 375, offset: 0 },
+        { name: "JIPMER Hospital", time: "11:50", latlng: [11.9530, 79.7968], m: 490, offset: 0 },
+        { name: "Pondy New Bus Stand", time: "12:00", latlng: [11.9325, 79.8159], m: 500, offset: 0 }
+    ];
+
+    const map = L.map('map', { zoomControl: false }).setView([12.5, 78.5], 11);
+    L.tileLayer('https://{s}.google.com/vt/lyrs=y,h&x={x}&y={y}&z={z}', { subdomains: ['mt0', 'mt1', 'mt2', 'mt3'] }).addTo(map);
+
+    let snappedRoute = [];
+    const busImageSrc = "busImageNew.png"; 
+
+    const busMarker = L.marker(stops[0].latlng, {
+        icon: L.divIcon({ html: `<div id="bus-icon-id" class="bus-container"><img src="${busImageSrc}" class="bus-image"></div>`, className: 'bus-div-icon', iconSize:[60,30], iconAnchor:[30,15] })
+    }).addTo(map);
+
+    stops.forEach(s => {
+        L.marker(s.latlng, {
+            icon: L.divIcon({ className: 'stop-pin', html: `<div style="background:#d32f2f; width:10px; height:10px; border-radius:50%; border:2px solid white;"></div>`, iconSize: [14, 14] })
+        }).addTo(map);
+    });
+
+    async function getLegitRoute() {
+        const coordsStr = stops.map(s => `${s.latlng[1]},${s.latlng[0]}`).join(';');
+        const url = `https://router.project-osrm.org/route/v1/driving/${coordsStr}?overview=full&geometries=geojson`;
+        const res = await fetch(url);
+        const data = await res.json();
+        snappedRoute = data.routes[0].geometry.coordinates.map(c => [c[1], c[0]]);
+        L.polyline(snappedRoute, { color: '#d32f2f', weight: 6, opacity: 0.9 }).addTo(map);
+    }
+
+    function telemetry() {
+        const now = new Date();
+        const ist = new Date(now.getTime() + (now.getTimezoneOffset() * 60000) + (5.5 * 3600000));
+        let h = ist.getHours(), m = ist.getMinutes(), s = ist.getSeconds();
+        
+        // Time logic relative to 03:40 start
+        const totalNowMins = (h * 60 + m) + (s / 60);
+        const tripStart = 3 * 60 + 40; // 03:40 AM
+        let elapsed = totalNowMins - tripStart;
+
+        // Logic to handle 24-hour cycle if trip crosses midnight or current time is early morning
+        if (elapsed < -600) elapsed += 1440; 
+
+        // Break logic (130m after 04:40 Majestic = 190m mark; 380m after 04:40 Majestic = 440m mark)
+        let vElapsed = elapsed;
+        if (elapsed >= 190 && elapsed < 210) vElapsed = 190;
+        else if (elapsed >= 210 && elapsed < 440) vElapsed -= 20;
+        else if (elapsed >= 440 && elapsed < 460) vElapsed = 420;
+        else if (elapsed >= 460) vElapsed -= 40;
+
+        document.getElementById('mins-left').innerText = Math.max(0, Math.round(500 - elapsed));
+
+        const progress = Math.max(0, Math.min(vElapsed / 500, 1));
+        if (snappedRoute.length > 0) {
+            const idx = Math.floor(progress * (snappedRoute.length - 1));
+            const pos = snappedRoute[idx];
+            const nextPos = snappedRoute[Math.min(idx + 5, snappedRoute.length - 1)]; 
+            busMarker.setLatLng(pos);
+            const dLon = (nextPos[1] - pos[1]) * Math.PI / 180;
+            const y = Math.sin(dLon) * Math.cos(nextPos[0] * Math.PI / 180);
+            const x = Math.cos(pos[0] * Math.PI / 180) * Math.sin(nextPos[0] * Math.PI / 180) - Math.sin(pos[0] * Math.PI / 180) * Math.cos(nextPos[0] * Math.PI / 180) * Math.cos(dLon);
+            const angle = Math.atan2(y, x) * 180 / Math.PI;
+            document.getElementById('bus-icon-id').style.transform = `rotate(${angle + 90}deg)`; 
+            map.panTo(pos, { animate: true, duration: 1.5 });
+        }
+
+        const tl = document.getElementById('timeline');
+        tl.innerHTML = '';
+        let currentStopIdx = stops.findIndex(s => vElapsed < s.m);
+        if (currentStopIdx === -1) currentStopIdx = stops.length - 1;
+
+        stops.forEach((st, i) => {
+            const isPassed = i < currentStopIdx;
+            const delayTag = st.offset > 0 ? `<span class="delay-tag delay-late">+${st.offset}m Delay</span>` : 
+                             st.offset < 0 ? `<span class="delay-tag delay-early">${st.offset}m Early</span>` : '';
+            tl.innerHTML += `<div class="stop ${isPassed ? 'passed' : i === currentStopIdx ? 'current' : ''}">
+                <span class="stop-time">${st.time} ${delayTag}</span><span class="stop-name">${st.name}</span></div>`;
+        });
+    }
+
+    getLegitRoute();
+    setInterval(telemetry, 2000);
+    function toggleSidebar() { document.getElementById('sidebar').classList.toggle('expanded'); }
+</script>
+</body>
+</html>
