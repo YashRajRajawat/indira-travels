@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <title>Indira Travels | Live Tracking</title>
+    <title>Indira Travels | Pondy to Bangalore Live</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         :root { --primary: #d32f2f; --dark: #121212; --panel: #1e1e1e; --text: #e0e0e0; }
@@ -76,23 +76,23 @@
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-    // Schedule synchronized for Christ College at 05:00 AM
+    // Reversed schedule starting from Pondicherry at 06:00 PM (18:00)
     const stops = [
-        { name: "Kalasipalyam", time: "03:40", latlng: [12.9595, 77.5806], m: 0, offset: 0 },
-        { name: "Majestic", time: "04:40", latlng: [12.9775, 77.5745], m: 60, offset: 3 },
-        { name: "Shanthinagar", time: "04:50", latlng: [12.9551, 77.5924], m: 70, offset: 10 },
-        { name: "Nimhans", time: "04:55", latlng: [12.9407, 77.5983], m: 75, offset: -4 },
-        { name: "Christ College", time: "05:00", latlng: [12.9362, 77.6062], m: 80, offset: 2 },
-        { name: "St John's Hospital", time: "05:05", latlng: [12.9296, 77.6160], m: 85, offset: -3 },
-        { name: "Madiwala Police Stn", time: "05:20", latlng: [12.9202, 77.6205], m: 100, offset: 5 },
-        { name: "Silk Board", time: "05:25", latlng: [12.9173, 77.6232], m: 105, offset: 8 },
-        { name: "Bommanahalli", time: "05:30", latlng: [12.9067, 77.6284], m: 110, offset: 0 },
-        { name: "Hosa Road", time: "05:40", latlng: [12.8707, 77.6529], m: 120, offset: -2 },
-        { name: "Electronic City", time: "05:50", latlng: [12.8452, 77.6602], m: 130, offset: 0 },
-        { name: "Krishnagiri Junction", time: "07:25", latlng: [12.5186, 78.2137], m: 225, offset: 0 },
-        { name: "Tiruvannamalai", time: "09:55", latlng: [12.2253, 79.0747], m: 375, offset: 0 },
-        { name: "JIPMER Hospital", time: "11:50", latlng: [11.9530, 79.7968], m: 490, offset: 0 },
-        { name: "Pondy New Bus Stand", time: "12:00", latlng: [11.9325, 79.8159], m: 500, offset: 0 }
+        { name: "Pondy New Bus Stand", time: "18:00", latlng: [11.9325, 79.8159], m: 0, offset: 0 },
+        { name: "JIPMER Hospital", time: "18:10", latlng: [11.9530, 79.7968], m: 10, offset: 0 },
+        { name: "Tiruvannamalai", time: "20:05", latlng: [12.2253, 79.0747], m: 125, offset: 0 },
+        { name: "Krishnagiri Junction", time: "22:35", latlng: [12.5186, 78.2137], m: 275, offset: 0 },
+        { name: "Electronic City", time: "00:10", latlng: [12.8452, 77.6602], m: 370, offset: 0 },
+        { name: "Hosa Road", time: "00:20", latlng: [12.8707, 77.6529], m: 380, offset: 0 },
+        { name: "Bommanahalli", time: "00:30", latlng: [12.9067, 77.6284], m: 390, offset: 0 },
+        { name: "Silk Board", time: "00:35", latlng: [12.9173, 77.6232], m: 395, offset: 0 },
+        { name: "Madiwala Police Stn", time: "00:40", latlng: [12.9202, 77.6205], m: 400, offset: 0 },
+        { name: "St John's Hospital", time: "00:55", latlng: [12.9296, 77.6160], m: 415, offset: 0 },
+        { name: "Christ College", time: "01:00", latlng: [12.9362, 77.6062], m: 420, offset: 0 },
+        { name: "Nimhans", time: "01:05", latlng: [12.9407, 77.5983], m: 425, offset: 0 },
+        { name: "Shanthinagar", time: "01:10", latlng: [12.9551, 77.5924], m: 430, offset: 0 },
+        { name: "Majestic", time: "01:20", latlng: [12.9775, 77.5745], m: 440, offset: 0 },
+        { name: "Kalasipalyam", time: "02:20", latlng: [12.9595, 77.5806], m: 500, offset: 0 }
     ];
 
     const map = L.map('map', { zoomControl: false }).setView([12.5, 78.5], 11);
@@ -118,18 +118,15 @@
         const data = await res.json();
         snappedRoute = data.routes[0].geometry.coordinates.map(c => [c[1], c[0]]);
         
-        // Split snapped route into segments based on closest points to our stops
         for (let i = 0; i < stops.length; i++) {
             let minDist = Infinity;
             let closestIdx = 0;
-            stops[i].latlng_rev = [stops[i].latlng[1], stops[i].latlng[0]];
             snappedRoute.forEach((coord, idx) => {
                 let d = Math.sqrt(Math.pow(coord[0]-stops[i].latlng[0],2) + Math.pow(coord[1]-stops[i].latlng[1],2));
                 if (d < minDist) { minDist = d; closestIdx = idx; }
             });
             stops[i].routeIdx = closestIdx;
         }
-
         L.polyline(snappedRoute, { color: '#d32f2f', weight: 6, opacity: 0.9 }).addTo(map);
     }
 
@@ -139,11 +136,13 @@
         let h = ist.getHours(), m = ist.getMinutes(), s = ist.getSeconds();
         
         const totalNowMins = (h * 60 + m) + (s / 60);
-        const tripStart = 3 * 60 + 40; // 03:40 AM
+        const tripStart = 18 * 60; // 06:00 PM (18:00)
         let elapsed = totalNowMins - tripStart;
+
+        // Handle day wrap (e.g. current time 01:00 AM)
         if (elapsed < -600) elapsed += 1440; 
 
-        // Apply 20m breaks
+        // 20m breaks logic retained relative to 500m journey
         let vElapsed = elapsed;
         if (elapsed >= 190 && elapsed < 210) vElapsed = 190;
         else if (elapsed >= 210 && elapsed < 440) vElapsed -= 20;
@@ -152,38 +151,28 @@
 
         document.getElementById('mins-left').innerText = Math.max(0, Math.round(500 - elapsed));
 
-        // PACE CONTROL: Find current segment
         let seg = stops.findIndex((s, i) => vElapsed >= s.m && (i === stops.length - 1 || vElapsed < stops[i+1].m));
         
         if (seg !== -1 && seg < stops.length - 1 && snappedRoute.length > 0) {
             const startStop = stops[seg];
             const endStop = stops[seg+1];
-            
-            // Segment progress (0 to 1)
             const segRatio = (vElapsed - startStop.m) / (endStop.m - startStop.m);
-            
-            // Find corresponding indices in the snappedRoute
             const startIdx = startStop.routeIdx;
             const endIdx = endStop.routeIdx;
             
-            // Current index on the high-res road path
             const currentRouteIdx = Math.floor(startIdx + (endIdx - startIdx) * segRatio);
             const pos = snappedRoute[currentRouteIdx];
             const nextPos = snappedRoute[Math.min(currentRouteIdx + 2, snappedRoute.length - 1)];
 
             busMarker.setLatLng(pos);
-            
-            // Rotation calculation
             const dLon = (nextPos[1] - pos[1]) * Math.PI / 180;
             const y = Math.sin(dLon) * Math.cos(nextPos[0] * Math.PI / 180);
             const x = Math.cos(pos[0] * Math.PI / 180) * Math.sin(nextPos[0] * Math.PI / 180) - Math.sin(pos[0] * Math.PI / 180) * Math.cos(nextPos[0] * Math.PI / 180) * Math.cos(dLon);
             const angle = Math.atan2(y, x) * 180 / Math.PI;
             document.getElementById('bus-icon-id').style.transform = `rotate(${angle + 90}deg)`; 
-            
             map.panTo(pos, { animate: true, duration: 1.5 });
         }
 
-        // Timeline Update
         const tl = document.getElementById('timeline');
         tl.innerHTML = '';
         stops.forEach((st, i) => {
